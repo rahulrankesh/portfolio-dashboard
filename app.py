@@ -94,6 +94,7 @@ def highlight_rows(row):
 
 styled_df = (
     df.style
+    .format("{:.2f}")  # 👈 THIS controls visible decimals
     .apply(highlight_rows, axis=1)
     .set_properties(**{
         'text-align': 'center'
@@ -109,4 +110,6 @@ styled_df = (
     ])
 )
 
+
 st.table(styled_df)
+
