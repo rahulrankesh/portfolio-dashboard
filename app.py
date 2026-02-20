@@ -2,42 +2,87 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
-from datetime import datetime
 
-st.set_page_config(page_title="Adaptive Quant Engine", layout="wide")
+st.set_page_config(page_title="Personal Capital Allocator", layout="wide")
 
-st.title("📊 Adaptive Growth + Regime Quant Engine")
+st.title("💼 Personal Capital Allocator")
 
-# ---------------------------------------
-# 1️⃣ Market Regime Detection (NIFTY)
-# ---------------------------------------
+# -------------------------------------------------
+# CENTERED TABLE RENDER FUNCTION
+# -------------------------------------------------
+
+def centered_table(dataframe):
+    styled = (
+        dataframe.style
+        .format("{:.2f}")
+        .set_properties(**{'text-align': 'center'})
+        .set_table_styles([
+            {'selector': 'th',
+             'props': [('text-align', 'center !important'),
+                       ('font-weight', 'bold')]},
+            {'selector': 'td',
+             'props': [('text-align', 'center !important')]}
+        ])
+    )
+
+    html = styled.to_html()
+
+    st.markdown("""
+        <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: center !important;
+        }
+        th, td {
+            text-align: center !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown(html, unsafe_allow_html=True)
+
+# -------------------------------------------------
+# USER INPUT
+# -------------------------------------------------
+
+default_stocks = "HDFCBANK,ICICIBANK,RELIANCE,INFY,TCS"
+
+stock_input = st.text_input(
+    "Enter stock symbols (comma separated, NSE format without .NS)",
+    default_stocks
+)
+
+capital = st.number_input(
+    "Enter Total Capital (₹)",
+    min_value=1000.0,
+    value=1000000.0,
+    step=10000.0
+)
+
+symbols = [s.strip().upper() + ".NS" for s in stock_input.split(",")]
+
+# -------------------------------------------------
+# MARKET REGIME DETECTION
+# -------------------------------------------------
+
 nifty = yf.Ticker("^NSEI")
 nifty_hist = nifty.history(period="1y")
 
 nifty_hist["MA50"] = nifty_hist["Close"].rolling(50).mean()
 nifty_hist["MA200"] = nifty_hist["Close"].rolling(200).mean()
 
-if nifty_hist["MA50"].iloc[-1] > nifty_hist["MA200"].iloc[-1]:
-    regime = "Bull"
-else:
-    regime = "Defensive"
+regime = "Bull" if nifty_hist["MA50"].iloc[-1] > nifty_hist["MA200"].iloc[-1] else "Defensive"
 
-st.subheader(f"Market Regime: {regime}")
+st.subheader(f"📈 Market Regime: {regime}")
 
-# ---------------------------------------
-# 2️⃣ Universe (Top 20 NIFTY for stability)
-# ---------------------------------------
-stocks = [
-    "HDFCBANK.NS","ICICIBANK.NS","RELIANCE.NS","INFY.NS","TCS.NS",
-    "LT.NS","SBIN.NS","ITC.NS","HINDUNILVR.NS","BHARTIARTL.NS",
-    "KOTAKBANK.NS","AXISBANK.NS","ASIANPAINT.NS","MARUTI.NS",
-    "BAJFINANCE.NS","HCLTECH.NS","WIPRO.NS","ONGC.NS","NTPC.NS","SUNPHARMA.NS"
-]
+# -------------------------------------------------
+# DATA COLLECTION & SCORING
+# -------------------------------------------------
 
 data = []
-spark_data = {}
 
-for symbol in stocks:
+for symbol in symbols:
     try:
         ticker = yf.Ticker(symbol)
 
@@ -47,10 +92,7 @@ for symbol in stocks:
         delta_pct = ((price - prev_close) / prev_close) * 100
 
         hist_1m = ticker.history(period="1mo")
-        spark = hist_1m["Close"]
-        spark_data[symbol] = spark
-
-        returns = spark.pct_change().dropna()
+        returns = hist_1m["Close"].pct_change().dropna()
         volatility = returns.std() * np.sqrt(252) * 100
 
         financials = ticker.financials.T
@@ -64,10 +106,8 @@ for symbol in stocks:
         equity = balance["Stockholders Equity"].iloc[0]
         roe = (net_income / equity) * 100
 
-        info = ticker.info
-        pe = info.get("trailingPE", 0)
+        pe = ticker.info.get("trailingPE", 0)
 
-        # Adaptive scoring
         if regime == "Bull":
             score = (
                 0.35 * growth +
@@ -99,17 +139,23 @@ for symbol in stocks:
     except:
         continue
 
+if len(data) == 0:
+    st.warning("No valid stock data found.")
+    st.stop()
+
 df = pd.DataFrame(data).set_index("Stock")
 df = df.sort_values("Score", ascending=False).round(2)
 
-st.subheader("🔢 Daily Ranking")
-st.dataframe(df, use_container_width=True)
+st.subheader("🔢 Ranked Universe")
+centered_table(df)
 
-# ---------------------------------------
-# 3️⃣ Monthly Rebalance (Top 5)
-# ---------------------------------------
-st.subheader("📌 Model Portfolio (Monthly Rebalance)")
-top_n = 5
+# -------------------------------------------------
+# RISK-ADJUSTED PORTFOLIO ALLOCATION
+# -------------------------------------------------
+
+st.subheader("📌 Capital Allocation (Monthly Rebalance)")
+
+top_n = min(5, len(df))
 portfolio = df.head(top_n).copy()
 
 portfolio["InvVol"] = 1 / portfolio["Volatility %"]
@@ -117,29 +163,35 @@ portfolio["Weight %"] = (
     portfolio["InvVol"] / portfolio["InvVol"].sum() * 100
 ).round(2)
 
+portfolio["Allocated ₹"] = (portfolio["Weight %"] / 100 * capital).round(2)
+portfolio["Quantity"] = (portfolio["Allocated ₹"] / portfolio["Price"]).astype(int)
+portfolio["Actual Invested ₹"] = (portfolio["Quantity"] * portfolio["Price"]).round(2)
+
 portfolio = portfolio.drop(columns=["InvVol"])
 
-st.dataframe(portfolio, use_container_width=True)
+centered_table(portfolio)
 
-# ---------------------------------------
-# 4️⃣ Live Model Return
-# ---------------------------------------
+# -------------------------------------------------
+# LIVE DAILY PORTFOLIO RETURN
+# -------------------------------------------------
+
 portfolio["Weighted Return"] = (
     portfolio["Δ %"] * portfolio["Weight %"] / 100
 )
 
 daily_return = portfolio["Weighted Return"].sum()
 
-st.metric("Today's Model Return (%)", round(daily_return, 2))
+st.metric("📊 Today's Portfolio Return (%)", round(daily_return, 2))
 
-# ---------------------------------------
-# 5️⃣ Backtest (1 Year Monthly Equal Weight)
-# ---------------------------------------
-st.subheader("📈 Backtest (1Y Monthly Rebalance - Simplified)")
+# -------------------------------------------------
+# 1-YEAR BACKTEST (Equal Weight Simplified)
+# -------------------------------------------------
+
+st.subheader("📈 1Y Equal Weight Backtest (Simplified)")
 
 price_data = {}
 
-for symbol in stocks[:15]:
+for symbol in symbols[:10]:
     try:
         ticker = yf.Ticker(symbol)
         hist = ticker.history(period="1y")["Close"]
@@ -149,9 +201,8 @@ for symbol in stocks[:15]:
 
 price_df = pd.DataFrame(price_data).dropna()
 
-monthly_returns = price_df.resample("M").last().pct_change()
-portfolio_returns = monthly_returns.mean(axis=1)
-
-cumulative = (1 + portfolio_returns).cumprod()
-
-st.line_chart(cumulative)
+if not price_df.empty:
+    monthly_returns = price_df.resample("M").last().pct_change()
+    portfolio_returns = monthly_returns.mean(axis=1)
+    cumulative = (1 + portfolio_returns).cumprod()
+    st.line_chart(cumulative)
