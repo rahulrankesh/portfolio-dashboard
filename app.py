@@ -36,9 +36,8 @@ for symbol in stocks:
         pe = info.get('trailingPE')
         pb = info.get('priceToBook')
 
-        # Calculate score safely
         score = (roe * sales_growth) / pe if pe else None
-        
+
         data.append({
             "Stock": symbol.replace(".NS", ""),
             "Price": round(price, 2),
@@ -49,20 +48,16 @@ for symbol in stocks:
             "Score": round(score, 4) if score else None
         })
 
-    except Exception as e:
+    except Exception:
         st.error(f"Error loading {symbol}")
 
 df = pd.DataFrame(data)
-
 df = df.set_index("Stock")
-
 df = df.sort_values(by="Score", ascending=False)
 
 # ---- Auto Refresh Every 60 Seconds ----
 st.markdown(
-    """
-    <meta http-equiv="refresh" content="60">
-    """,
+    '<meta http-equiv="refresh" content="60">',
     unsafe_allow_html=True
 )
 
@@ -71,7 +66,6 @@ top_stock = df.index[0]
 
 def highlight_rows(row):
     styles = []
-
     for col in df.columns:
         style = "text-align: center !important;"
 
@@ -88,19 +82,17 @@ def highlight_rows(row):
 
     return styles
 
-    styled_df = df.style.apply(highlight_rows, axis=1)\
-                    .set_properties(**{
-                            'text-align': 'center',
-                            'margin': 'auto'
-                        })\
-                    .set_table_styles([{
-                        'selector': 'th',
-                        'props': [('text-align', 'center')]
-                    }])
+
+styled_df = (
+    df.style
+    .apply(highlight_rows, axis=1)
+    .set_properties(**{
+        'text-align': 'center',
+        'margin': 'auto'
+    })
+    .set_table_styles([
+        {'selector': 'th', 'props': [('text-align', 'center')]}
+    ])
+)
 
 st.table(styled_df)
-
-
-
-
-
