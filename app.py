@@ -2,10 +2,45 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
+from datetime import datetime
+import pytz
 
 st.set_page_config(page_title="Personal Capital Allocator", layout="wide")
+st.title("💼 Production-Ready Personal Capital Allocator")
 
-st.title("💼 Personal Capital Allocator")
+# -------------------------------------------------
+# MARKET HOURS CONTROL (IST)
+# -------------------------------------------------
+
+ist = pytz.timezone("Asia/Kolkata")
+now = datetime.now(ist)
+
+market_open = now.replace(hour=9, minute=15, second=0, microsecond=0)
+market_close = now.replace(hour=15, minute=30, second=0, microsecond=0)
+
+is_market_open = market_open <= now <= market_close
+
+if is_market_open:
+    st.markdown(
+        "<p style='font-size:13px; color:green;'>● LIVE</p>",
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        '<meta http-equiv="refresh" content="60">',
+        unsafe_allow_html=True
+    )
+else:
+    st.markdown(
+        "<p style='font-size:13px; color:red;'>● Market Closed</p>",
+        unsafe_allow_html=True
+    )
+
+last_refresh = now.strftime("%d %b %Y | %H:%M:%S IST")
+
+st.markdown(
+    f"<p style='font-size:11px; color:gray;'>Last updated: {last_refresh}</p>",
+    unsafe_allow_html=True
+)
 
 # -------------------------------------------------
 # CENTERED TABLE RENDER FUNCTION
@@ -43,24 +78,30 @@ def centered_table(dataframe):
     st.markdown(html, unsafe_allow_html=True)
 
 # -------------------------------------------------
-# USER INPUT
+# COMPACT USER INPUT ROW
 # -------------------------------------------------
 
-default_stocks = "HDFCBANK,ICICIBANK,RELIANCE,INFY,TCS"
+col1, col2 = st.columns([3,1])
 
-stock_input = st.text_input(
-    "Enter stock symbols (comma separated, NSE format without .NS)",
-    default_stocks
-)
+with col1:
+    stock_input = st.text_input(
+        "Stocks (comma separated, NSE format without .NS)",
+        "HDFCBANK,ICICIBANK,RELIANCE,INFY,TCS,LT,SBIN,ITC,HCLTECH,BHARTIARTL"
+    )
 
-capital = st.number_input(
-    "Enter Total Capital (₹)",
-    min_value=1000.0,
-    value=1000000.0,
-    step=10000.0
-)
+with col2:
+    capital = st.number_input(
+        "Capital (₹)",
+        min_value=1000.0,
+        value=1000000.0,
+        step=10000.0
+    )
 
 symbols = [s.strip().upper() + ".NS" for s in stock_input.split(",")]
+
+if len(symbols) < 10:
+    st.warning("Minimum 10 stocks required.")
+    st.stop()
 
 # -------------------------------------------------
 # MARKET REGIME DETECTION
@@ -140,7 +181,7 @@ for symbol in symbols:
         continue
 
 if len(data) == 0:
-    st.warning("No valid stock data found.")
+    st.warning("No valid stock data.")
     st.stop()
 
 df = pd.DataFrame(data).set_index("Stock")
@@ -172,7 +213,7 @@ portfolio = portfolio.drop(columns=["InvVol"])
 centered_table(portfolio)
 
 # -------------------------------------------------
-# LIVE DAILY PORTFOLIO RETURN
+# LIVE DAILY RETURN
 # -------------------------------------------------
 
 portfolio["Weighted Return"] = (
@@ -184,14 +225,14 @@ daily_return = portfolio["Weighted Return"].sum()
 st.metric("📊 Today's Portfolio Return (%)", round(daily_return, 2))
 
 # -------------------------------------------------
-# 1-YEAR BACKTEST (Equal Weight Simplified)
+# PERFORMANCE SUMMARY (1Y)
 # -------------------------------------------------
 
-st.subheader("📈 1Y Equal Weight Backtest (Simplified)")
+st.subheader("📊 Strategy Performance Summary (1Y)")
 
 price_data = {}
 
-for symbol in symbols[:10]:
+for symbol in symbols[:15]:
     try:
         ticker = yf.Ticker(symbol)
         hist = ticker.history(period="1y")["Close"]
@@ -202,7 +243,29 @@ for symbol in symbols[:10]:
 price_df = pd.DataFrame(price_data).dropna()
 
 if not price_df.empty:
+
     monthly_returns = price_df.resample("M").last().pct_change()
-    portfolio_returns = monthly_returns.mean(axis=1)
-    cumulative = (1 + portfolio_returns).cumprod()
-    st.line_chart(cumulative)
+    strategy_returns = monthly_returns.mean(axis=1)
+
+    cumulative = (1 + strategy_returns).cumprod()
+
+    total_return = cumulative.iloc[-1] - 1
+    annual_vol = strategy_returns.std() * np.sqrt(12)
+    sharpe = total_return / annual_vol if annual_vol != 0 else 0
+
+    running_max = cumulative.cummax()
+    drawdown = (cumulative / running_max) - 1
+    max_drawdown = drawdown.min()
+
+    nifty = yf.Ticker("^NSEI").history(period="1y")["Close"]
+    nifty_monthly = nifty.resample("M").last().pct_change()
+    nifty_cum = (1 + nifty_monthly).cumprod()
+    nifty_return = nifty_cum.iloc[-1] - 1
+
+    col1, col2, col3, col4, col5 = st.columns(5)
+
+    col1.metric("Strategy Return", f"{total_return*100:.2f}%")
+    col2.metric("NIFTY Return", f"{nifty_return*100:.2f}%")
+    col3.metric("Volatility", f"{annual_vol*100:.2f}%")
+    col4.metric("Sharpe Ratio", f"{sharpe:.2f}")
+    col5.metric("Max Drawdown", f"{max_drawdown*100:.2f}%")
