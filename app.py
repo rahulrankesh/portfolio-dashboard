@@ -58,6 +58,18 @@ df = df.set_index("Stock")   # optional but cleaner
 
 df = df.sort_values(by="Score", ascending=False)
 
-st.dataframe(df, use_container_width=True)
+st.dataframe(
+    df,
+    use_container_width=True,
+    column_config={
+        "Price": st.column_config.NumberColumn(format="%.2f"),
+        "Sales Growth (%)": st.column_config.NumberColumn(format="%.2f"),
+        "ROE (%)": st.column_config.NumberColumn(format="%.2f"),
+        "PE": st.column_config.NumberColumn(format="%.2f"),
+        "PB": st.column_config.NumberColumn(format="%.2f"),
+        "Score": st.column_config.NumberColumn(format="%.4f"),
+    }
+)
+
 
 
