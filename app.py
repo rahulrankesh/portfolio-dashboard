@@ -6,7 +6,7 @@ from datetime import datetime
 import pytz
 
 st.set_page_config(page_title="Personal Capital Allocator", layout="wide")
-st.title("💼 Production-Ready Personal Capital Allocator")
+st.title("💼 Personal Capital Allocator")
 
 # -------------------------------------------------
 # MARKET HOURS CONTROL (IST)
@@ -269,3 +269,4 @@ if not price_df.empty:
     col3.metric("Volatility", f"{annual_vol*100:.2f}%")
     col4.metric("Sharpe Ratio", f"{sharpe:.2f}")
     col5.metric("Max Drawdown", f"{max_drawdown*100:.2f}%")
+
