@@ -51,10 +51,14 @@ for symbol in stocks:
     except Exception:
         st.error(f"Error loading {symbol}")
 
-df = pd.DataFrame(data)
-df = df.set_index("Stock")
-df = df.sort_values(by="Score", ascending=False)
-df = df.round(2)
+df = df.copy()
+df["Price"] = df["Price"].round(2)
+df["Sales Growth (%)"] = df["Sales Growth (%)"].round(2)
+df["ROE (%)"] = df["ROE (%)"].round(2)
+df["PE"] = df["PE"].round(2)
+df["PB"] = df["PB"].round(2)
+df["Score"] = df["Score"].round(4)
+
 
 
 # ---- Auto Refresh Every 60 Seconds ----
@@ -111,5 +115,6 @@ styled_df = (
 
 
 st.table(styled_df)
+
 
 
