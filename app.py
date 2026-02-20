@@ -54,6 +54,8 @@ for symbol in stocks:
 df = pd.DataFrame(data)
 df = df.set_index("Stock")
 df = df.sort_values(by="Score", ascending=False)
+df = df.round(2)
+
 
 # ---- Auto Refresh Every 60 Seconds ----
 st.markdown(
@@ -109,4 +111,5 @@ styled_df = (
 
 
 st.table(styled_df)
+
 
