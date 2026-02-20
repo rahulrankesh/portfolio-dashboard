@@ -54,22 +54,52 @@ for symbol in stocks:
 
 df = pd.DataFrame(data)
 
-df = df.set_index("Stock")   # optional but cleaner
+df = df.set_index("Stock")
 
 df = df.sort_values(by="Score", ascending=False)
 
-st.dataframe(
-    df,
-    use_container_width=True,
-    column_config={
-        "Price": st.column_config.NumberColumn(format="%.2f"),
-        "Sales Growth (%)": st.column_config.NumberColumn(format="%.2f"),
-        "ROE (%)": st.column_config.NumberColumn(format="%.2f"),
-        "PE": st.column_config.NumberColumn(format="%.2f"),
-        "PB": st.column_config.NumberColumn(format="%.2f"),
-        "Score": st.column_config.NumberColumn(format="%.4f"),
-    }
+# ---- Auto Refresh Every 60 Seconds ----
+st.markdown(
+    """
+    <meta http-equiv="refresh" content="60">
+    """,
+    unsafe_allow_html=True
 )
+
+# ---- Identify Top Ranked Stock ----
+top_stock = df.index[0]
+
+def highlight_rows(row):
+    styles = []
+
+    for col in df.columns:
+        style = "text-align: center;"
+
+        # Highlight ROE > 20%
+        if col == "ROE (%)" and row[col] > 20:
+            style += "color: green; font-weight: bold;"
+
+        # Highlight PE > 30
+        if col == "PE" and row[col] and row[col] > 30:
+            style += "color: red; font-weight: bold;"
+
+        # Highlight Top Ranked Stock
+        if row.name == top_stock:
+            style += "background-color: #1f2c56; color: white;"
+
+        styles.append(style)
+
+    return styles
+
+styled_df = df.style.apply(highlight_rows, axis=1)\
+                    .set_properties(**{'text-align': 'center'})\
+                    .set_table_styles([{
+                        'selector': 'th',
+                        'props': [('text-align', 'center')]
+                    }])
+
+st.table(styled_df)
+
 
 
 
