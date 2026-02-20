@@ -36,13 +36,17 @@ for symbol in stocks:
         pe = info.get('trailingPE')
         pb = info.get('priceToBook')
 
+        # Calculate score safely
+        score = (roe * sales_growth) / pe if pe else None
+        
         data.append({
             "Stock": symbol.replace(".NS", ""),
-            "Price": round(price,2),
-            "Sales Growth": round(sales_growth*100,2),
-            "ROE": round(roe*100,2),
+            "Price": round(price, 2),
+            "Sales Growth (%)": round(sales_growth * 100, 2),
+            "ROE (%)": round(roe * 100, 2),
             "PE": pe,
-            "PB": pb
+            "PB": pb,
+            "Score": round(score, 4) if score else None
         })
 
     except Exception as e:
@@ -50,4 +54,10 @@ for symbol in stocks:
 
 df = pd.DataFrame(data)
 
+df = df.set_index("Stock")   # optional but cleaner
+
+df = df.sort_values(by="Score", ascending=False)
+
 st.dataframe(df, use_container_width=True)
+
+
