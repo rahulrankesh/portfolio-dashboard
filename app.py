@@ -19,8 +19,10 @@ for symbol in stocks:
     try:
         ticker = yf.Ticker(symbol)
 
+        # Live price
         price = ticker.history(period="1d")['Close'].iloc[-1]
 
+        # Financials
         financials = ticker.financials.T
         balance_sheet = ticker.balance_sheet.T
 
@@ -36,30 +38,29 @@ for symbol in stocks:
         pe = info.get('trailingPE')
         pb = info.get('priceToBook')
 
-        score = (roe * sales_growth) / pe if pe else None
+        # Scaled score (clean magnitude)
+        score = (roe * sales_growth) * 100
 
         data.append({
             "Stock": symbol.replace(".NS", ""),
-            "Price": round(price, 2),
-            "Sales Growth (%)": round(sales_growth * 100, 2),
-            "ROE (%)": round(roe * 100, 2),
+            "Price": price,
+            "Sales Growth (%)": sales_growth * 100,
+            "ROE (%)": roe * 100,
             "PE": pe,
             "PB": pb,
-            "Score": round(score, 4) if score else None
+            "Score": score
         })
 
     except Exception:
         st.error(f"Error loading {symbol}")
 
-df = df.copy()
-df["Price"] = df["Price"].round(2)
-df["Sales Growth (%)"] = df["Sales Growth (%)"].round(2)
-df["ROE (%)"] = df["ROE (%)"].round(2)
-df["PE"] = df["PE"].round(2)
-df["PB"] = df["PB"].round(2)
-df["Score"] = df["Score"].round(4)
+# ---- Create DataFrame ----
+df = pd.DataFrame(data)
+df = df.set_index("Stock")
+df = df.sort_values(by="Score", ascending=False)
 
-
+# ---- Round All Numbers to 2 Decimals ----
+df = df.round(2)
 
 # ---- Auto Refresh Every 60 Seconds ----
 st.markdown(
@@ -75,12 +76,15 @@ def highlight_rows(row):
     for col in df.columns:
         style = "text-align: center !important;"
 
+        # ROE > 20% → green
         if col == "ROE (%)" and row[col] > 20:
             style += "color: green; font-weight: bold;"
 
+        # PE > 30 → red
         if col == "PE" and row[col] and row[col] > 30:
             style += "color: red; font-weight: bold;"
 
+        # Top ranked stock highlight
         if row.name == top_stock:
             style += "background-color: #1f2c56; color: white;"
 
@@ -88,13 +92,11 @@ def highlight_rows(row):
 
     return styles
 
-
 styled_df = (
     df.style
     .apply(highlight_rows, axis=1)
     .set_properties(**{
-        'text-align': 'center',
-        'margin': 'auto'
+        'text-align': 'center'
     })
     .set_table_styles([
         {
@@ -103,18 +105,8 @@ styled_df = (
                 ('text-align', 'center !important'),
                 ('font-weight', 'bold')
             ]
-        },
-        {
-            'selector': 'td',
-            'props': [
-                ('text-align', 'center !important')
-            ]
         }
     ])
 )
 
-
 st.table(styled_df)
-
-
-
