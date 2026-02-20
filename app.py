@@ -73,17 +73,14 @@ def highlight_rows(row):
     styles = []
 
     for col in df.columns:
-        style = "text-align: center;"
+        style = "text-align: center !important;"
 
-        # Highlight ROE > 20%
         if col == "ROE (%)" and row[col] > 20:
             style += "color: green; font-weight: bold;"
 
-        # Highlight PE > 30
         if col == "PE" and row[col] and row[col] > 30:
             style += "color: red; font-weight: bold;"
 
-        # Highlight Top Ranked Stock
         if row.name == top_stock:
             style += "background-color: #1f2c56; color: white;"
 
@@ -91,14 +88,18 @@ def highlight_rows(row):
 
     return styles
 
-styled_df = df.style.apply(highlight_rows, axis=1)\
-                    .set_properties(**{'text-align': 'center'})\
+    styled_df = df.style.apply(highlight_rows, axis=1)\
+                    .set_properties(**{
+                            'text-align': 'center',
+                            'margin': 'auto'
+                        })\
                     .set_table_styles([{
                         'selector': 'th',
                         'props': [('text-align', 'center')]
                     }])
 
 st.table(styled_df)
+
 
 
 
