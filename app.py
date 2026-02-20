@@ -91,8 +91,22 @@ styled_df = (
         'margin': 'auto'
     })
     .set_table_styles([
-        {'selector': 'th', 'props': [('text-align', 'center')]}
+        {
+            'selector': 'th',
+            'props': [
+                ('text-align', 'center !important'),
+                ('font-weight', 'bold')
+            ]
+        },
+        {
+            'selector': 'td',
+            'props': [
+                ('text-align', 'center !important')
+            ]
+        }
     ])
 )
 
+
 st.table(styled_df)
+
